@@ -40,6 +40,14 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 RUN mkdir -p storage bootstrap/cache \
     && chmod -R 777 storage bootstrap/cache
 
+RUN mkdir -p \
+    storage/framework/sessions \
+    storage/framework/cache \
+    storage/framework/views \
+    bootstrap/cache \
+    database \
+ && chmod -R 777 storage bootstrap/cache database
+
 # Expose Render port
 EXPOSE 10000
 
