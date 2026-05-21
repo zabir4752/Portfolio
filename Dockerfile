@@ -1,69 +1,43 @@
 # ==========================================
-# Stage 1: Compile Frontend Assets (Vite)
+# PHP + Composer base image
 # ==========================================
-FROM node:20-alpine AS node-builder
-WORKDIR /app
+FROM php:8.4-cli-alpine
 
-# Install npm dependencies
-COPY package*.json ./
-RUN npm i
-
-# Copy all source files and compile
-COPY . .
-RUN npm run build
-
-# ==========================================
-# Stage 2: Production PHP Application Image
-# ==========================================
-FROM php:fpm-alpine
-
-# Set directory path
 WORKDIR /var/www/html
 
-# Copy Composer binary from official image
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Install system dependencies and PHP libraries required by Laravel
+# Install system dependencies + PHP extensions
 RUN apk add --no-cache \
-    nginx \
-    supervisor \
+    git \
     curl \
-    libpng-dev \
-    libxml2-dev \
-    zip \
     unzip \
+    zip \
     sqlite-dev \
-    libzip-dev
+    libzip-dev \
+    oniguruma-dev \
+    $PHPIZE_DEPS
 
 # Install PHP extensions
 RUN docker-php-ext-install \
+    pdo \
     pdo_sqlite \
     bcmath \
-    opcache \
     zip
 
-# Copy application source files
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy project files
 COPY . .
 
-# Copy compiled frontend assets from Stage 1
-COPY --from=node-builder /app/public/build ./public/build
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Install PHP composer dependencies for production
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+# Laravel permissions
+RUN mkdir -p storage bootstrap/cache \
+    && chmod -R 777 storage bootstrap/cache
 
-# Create necessary supervisor and log directories
-RUN mkdir -p /etc/supervisor/conf.d/ /var/log/supervisor /var/run
+# Expose port Render uses
+EXPOSE 10000
 
-# Copy docker environment configurations
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-
-# Secure file permissions for Laravel runtime folders
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-
-# Expose HTTP port 80
-EXpose 80
-
-# Execute custom entrypoint script
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# Start Laravel server (Render requires binding to $PORT)
+CMD php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
