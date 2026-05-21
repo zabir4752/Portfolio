@@ -15,7 +15,7 @@ RUN npm run build
 # ==========================================
 # Stage 2: Production PHP Application Image
 # ==========================================
-FROM php:8.3-fpm-alpine
+FROM php:fpm-alpine
 
 # Set directory path
 WORKDIR /var/www/html
