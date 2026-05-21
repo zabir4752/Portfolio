@@ -1,11 +1,11 @@
 # ==========================================
-# PHP + Composer base image
+# PHP Base Image
 # ==========================================
 FROM php:8.4-cli-alpine
 
 WORKDIR /var/www/html
 
-# Install system dependencies + PHP extensions
+# Install system dependencies
 RUN apk add --no-cache \
     git \
     curl \
@@ -26,18 +26,22 @@ RUN docker-php-ext-install \
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy project files
+# Copy project FIRST
 COPY . .
+
+# Create SQLite DB (only if using sqlite)
+RUN mkdir -p database \
+    && touch database/database.sqlite
 
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Laravel permissions
+# Fix permissions
 RUN mkdir -p storage bootstrap/cache \
     && chmod -R 777 storage bootstrap/cache
 
-# Expose port Render uses
+# Expose Render port
 EXPOSE 10000
 
-# Start Laravel server (Render requires binding to $PORT)
+# Start Laravel
 CMD php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
